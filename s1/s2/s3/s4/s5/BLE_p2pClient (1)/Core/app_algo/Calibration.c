@@ -9,9 +9,11 @@
 #define CALI_EFFECTIVE_SAMPLES 150
 #define CALI_NOISE_THRESHOLD 1.0f
 
-#define Suggested_Calibration_X -0.01590f
+#define Suggested_Calibration_X -0.01590f        //-0.01x ~ -0.02x
 #define Suggested_Calibration_Y -0.28385f
 #define Suggested_Calibration_Z -0.38815f
+
+#define DeadZone_Range 0.1f
 
 //float gyro_x_bias,gyro_y_bias,gyro_z_bias=0;
 static uint8_t is_calibrated=0;
@@ -64,4 +66,11 @@ void gyro_Calibration(float *gyro_x,float *gyro_y,float *gyro_z)
         *gyro_y-=gyro_bias[1];
         *gyro_z-=gyro_bias[2];
     }
+}
+
+void gyro_DeadZone_execute(float *gyro_x,float *gyro_y,float *gyro_z)
+{
+	if(fabsf(*gyro_x) < DeadZone_Range) *gyro_x=0.0f;
+	if(fabsf(*gyro_y) < DeadZone_Range) *gyro_y=0.0f;
+	if(fabsf(*gyro_z) < DeadZone_Range) *gyro_z=0.0f;
 }

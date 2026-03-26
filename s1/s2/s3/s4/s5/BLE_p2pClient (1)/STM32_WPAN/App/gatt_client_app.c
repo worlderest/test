@@ -1776,7 +1776,7 @@ void My_IMU_Math_Task(void)
     float* my_gyro = IMU_Get_Gyro();
     
 	gyro_Calibration(my_gyro,my_gyro+1,my_gyro+2);
-	
+	gyro_DeadZone_execute(my_gyro,my_gyro+1,my_gyro+2);
 	
     // (可选) 你可以用原厂的 LOG 打印一下 Z 轴加速度，看看是不是在 1.0g 附近
     // 注意：用 %f 打印浮点数可能需要在 IDE 里开启 printf float 支持
