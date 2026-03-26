@@ -1,0 +1,1 @@
+ble_p2pclient\startup_stm32wba55xx.o: startup_stm32wba55xx.s
