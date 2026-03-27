@@ -1,17 +1,16 @@
 #include <stdint.h>
-#include <stdio.h>
 #include <math.h>
 #include "Calibration.h"
 #include "log_module.h"
 
 #define ODR 50
 #define CALI_SAMPLES  200
-#define CALI_EFFECTIVE_SAMPLES 190
-#define CALI_NOISE_THRESHOLD 0.10f
+#define CALI_EFFECTIVE_SAMPLES 150
+#define CALI_NOISE_THRESHOLD 0.1f
 
-#define Suggested_Calibration_X -0.01590f        //-0.01x ~ -0.02x
-#define Suggested_Calibration_Y -0.28385f
-#define Suggested_Calibration_Z -0.38815f
+#define Suggested_Calibration_X 0.02135f
+#define Suggested_Calibration_Y -0.34370f
+#define Suggested_Calibration_Z -0.40565f
 
 #define Suggested_DeadZone_Range 0.10f
 
@@ -63,10 +62,10 @@ void gyro_Calibration(float *gyro_x,float *gyro_y,float *gyro_z)
 				}
                 is_calibrated = 1;
 				
-				LOG_INFO_APP("------------------------ Auto Calibration Success ---------------\r\n");
-                LOG_INFO_APP("Bias X: %.5f | DeadZone X: %.5f\r\n", gyro_bias[0], gyro_deadzone[0]);
-                LOG_INFO_APP("Bias Y: %.5f | DeadZone Y: %.5f\r\n", gyro_bias[1], gyro_deadzone[1]);
-                LOG_INFO_APP("Bias Z: %.5f | DeadZone Z: %.5f\r\n", gyro_bias[2], gyro_deadzone[2]);
+//				LOG_INFO_APP("------------------------ Auto Calibration Success ---------------\r\n");
+//                LOG_INFO_APP("Bias X: %.5f | DeadZone X: %.5f\r\n", gyro_bias[0], gyro_deadzone[0]);
+//                LOG_INFO_APP("Bias Y: %.5f | DeadZone Y: %.5f\r\n", gyro_bias[1], gyro_deadzone[1]);
+//                LOG_INFO_APP("Bias Z: %.5f | DeadZone Z: %.5f\r\n", gyro_bias[2], gyro_deadzone[2]);
             }
             else
             {

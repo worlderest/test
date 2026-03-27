@@ -38,6 +38,7 @@
 #include "app_bsp.h"
 #include "imu_process.h"
 #include "Calibration.h"
+#include "Filter.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -1777,20 +1778,35 @@ void My_IMU_Math_Task(void)
     
 	gyro_Calibration(my_gyro,my_gyro+1,my_gyro+2);
 	gyro_DeadZone_execute(my_gyro,my_gyro+1,my_gyro+2);
+	EMA_Filter(my_acc,my_acc+1,my_acc+2);
+	
+	MahonyAHRSupdateIMU(my_gyro[0],my_gyro[1],my_gyro[2],my_acc[0],my_acc[1],my_acc[2]);
 	
     // (可选) 你可以用原厂的 LOG 打印一下 Z 轴加速度，看看是不是在 1.0g 附近
     // 注意：用 %f 打印浮点数可能需要在 IDE 里开启 printf float 支持
-	  LOG_INFO_APP("\r\n--- IMU DATA ---\r\n");
 	
-      LOG_INFO_APP("Acc X: %.5f g\r\n", my_acc[0]);
-      LOG_INFO_APP("Acc Y: %.5f g\r\n", my_acc[1]);
-      LOG_INFO_APP("Acc Z: %.5f g\r\n", my_acc[2]);
-      LOG_INFO_APP("Gyro X: %.5f dps\r\n", my_gyro[0]);
-      LOG_INFO_APP("Gyro Y: %.5f dps\r\n", my_gyro[1]);
-      LOG_INFO_APP("Gyro Z: %.5f dps\r\n", my_gyro[2]);
-	  LOG_INFO_APP("Mag of Acc: %.5f g \r\n",sqrtf(my_acc[0]*my_acc[0]+my_acc[1]*my_acc[1]+my_acc[2]*my_acc[2]));
-	  LOG_INFO_APP("Mag of Gyro: %.5f dps \r\n",sqrtf(my_gyro[0]*my_gyro[0]+my_gyro[1]*my_gyro[1]+my_gyro[2]*my_gyro[2]));
+//	  LOG_INFO_APP("\r\n--- IMU DATA ---\r\n");	
+//      LOG_INFO_APP("Acc X: %.5f g\r\n", my_acc[0]);
+//      LOG_INFO_APP("Acc Y: %.5f g\r\n", my_acc[1]);
+//      LOG_INFO_APP("Acc Z: %.5f g\r\n", my_acc[2]);
+//      LOG_INFO_APP("Gyro X: %.5f dps\r\n", my_gyro[0]);
+//      LOG_INFO_APP("Gyro Y: %.5f dps\r\n", my_gyro[1]);
+//      LOG_INFO_APP("Gyro Z: %.5f dps\r\n", my_gyro[2]);
+//	  LOG_INFO_APP("Mag of Acc: %.5f g \r\n",sqrtf(my_acc[0]*my_acc[0]+my_acc[1]*my_acc[1]+my_acc[2]*my_acc[2]));
+//	  LOG_INFO_APP("Mag of Gyro: %.5f dps \r\n",sqrtf(my_gyro[0]*my_gyro[0]+my_gyro[1]*my_gyro[1]+my_gyro[2]*my_gyro[2]));
 
+	
+//	float vofa_buffer[4]={my_acc[0],my_acc[1],my_acc[2],0.0f};
+//	uint8_t tail[4]={0x00, 0x00, 0x80, 0x7F};
+//	memcpy(&(vofa_buffer[3]),tail,4);
+//	HAL_UART_Transmit(&huart1, (uint8_t*)vofa_buffer, 16, HAL_MAX_DELAY);
+
+		float pitch,roll,yaw;
+		IMU_Get_EulerAngles(&pitch,&roll,&yaw);
+	    float vofa_buffer[4]={pitch,roll,yaw,0.0f};
+		uint8_t tail[4]={0x00, 0x00, 0x80, 0x7F};
+		memcpy(&(vofa_buffer[3]),tail,4);
+		HAL_UART_Transmit(&huart1, (uint8_t*)vofa_buffer, 16, HAL_MAX_DELAY);
 
 }
 /* USER CODE END LF */

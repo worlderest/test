@@ -18,8 +18,8 @@ typedef struct {
 } ImuPayload_t;
 #pragma pack()
 
-#define Kp 2.0f     // 比例增益：信任加速度计的程度 (如果画面抖，可以改小)
-#define Ki 0.005f   // 积分增益：消除陀螺仪零偏漂移
+#define Kp 2.0f//2.0f     // 比例增益：信任加速度计的程度 (如果画面抖，可以改小)
+#define Ki 0.005f//0.005f   // 积分增益：消除陀螺仪零偏漂移
 #define halfT 0.01f // 你是 50Hz(20ms)，所以周期一半是 0.01 秒
 
 // 核心姿态：四元数 (初始化为绝对平放，q0=1，其余为0)
@@ -35,56 +35,60 @@ static inline float invSqrt(float x) {
     return 1.0f / sqrtf(x); // 编译器会自动翻译为 VSQRT.F32 硬件指令
 }
 
-static void MahonyAHRSupdateIMU(float gx, float gy, float gz, float ax, float ay, float az) {
+void MahonyAHRSupdateIMU(float gx, float gy, float gz, float ax, float ay, float az) {
     float norm;
     float vx, vy, vz;
     float ex, ey, ez;
+	
+	gx*=0.017453f;
+	gy*=0.017453f;
+	gz*=0.017453f;
+    // 1. 加速度计向量归一化 (只有方向有用)
+    norm = sqrtf(ax * ax + ay * ay + az * az);
+    if (norm == 0.0f) return; // 避免除零
+    ax /= norm;
+    ay /= norm;
+    az /= norm;
 
-    // 将陀螺仪的 度/秒(dps) 转换为 弧度/秒(rad/s)
-    gx *= 0.0174533f;
-    gy *= 0.0174533f;
-    gz *= 0.0174533f;
+    // 2. 提取当前四元数所代表的“理论重力方向” (从地理坐标系转到机体坐标系)
+    // 这是四元数旋转矩阵的第三列
+    vx = 2.0f * (q1 * q3 - q0 * q2);
+    vy = 2.0f * (q0 * q1 + q2 * q3);
+    vz = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
 
-    // 如果加速度计有有效数据
-    if(ax != 0.0f || ay != 0.0f || az != 0.0f) {
-        // 归一化加速度计测量值
-        norm = invSqrt(ax * ax + ay * ay + az * az);
-        ax *= norm;  ay *= norm;  az *= norm;
+    // 3. 计算误差 (测量到的重力方向 与 预测方向 的叉积)
+    ex = (ay * vz - az * vy);
+    ey = (az * vx - ax * vz);
+    ez = (ax * vy - ay * vx);
 
-        // 提取当前四元数推算出的重力方向
-        vx = 2.0f * (q1 * q3 - q0 * q2);
-        vy = 2.0f * (q0 * q1 + q2 * q3);
-        vz = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
-
-        // 计算误差：测量重力方向与推算重力方向的叉积
-        ex = (ay * vz - az * vy);
-        ey = (az * vx - ax * vz);
-        ez = (ax * vy - ay * vx);
-
-        // 误差积分
-        if(Ki > 0.0f) {
-            exInt += ex * Ki;  eyInt += ey * Ki;  ezInt += ez * Ki;
-        } else {
-            exInt = 0.0f;  eyInt = 0.0f;  ezInt = 0.0f;
-        }
-
-        // PI 修正陀螺仪角速度
-        gx += Kp * ex + exInt;
-        gy += Kp * ey + eyInt;
-        gz += Kp * ez + ezInt;
+    // 4. 误差积分 (用于消除陀螺仪漂移)
+    if (Ki > 0.0f) {
+        exInt += ex * Ki;
+        eyInt += ey * Ki;
+        ezInt += ez * Ki;
+    } else {
+        exInt = 0.0f; eyInt = 0.0f; ezInt = 0.0f;
     }
 
-    // 整合四元数率并积分
-    gx *= halfT;  gy *= halfT;  gz *= halfT;
-    float qa = q0, qb = q1, qc = q2;
-    q0 += (-qb * gx - qc * gy - q3 * gz);
-    q1 += (qa * gx + qc * gz - q3 * gy);
-    q2 += (qa * gy - qb * gz + q3 * gx);
-    q3 += (qa * gz + qb * gy - qc * gx);
+    // 5. 反馈修正：调整角速度
+    gx = gx + Kp * ex + exInt;
+    gy = gy + Kp * ey + eyInt;
+    gz = gz + Kp * ez + ezInt;
 
-    // 归一化四元数
-    norm = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-    q0 *= norm;  q1 *= norm;  q2 *= norm;  q3 *= norm;
+    // 6. 一阶龙格-库塔法更新四元数微分方程
+    // q_new = q_old + 0.5 * dt * q_old * omega
+    float q0_last = q0, q1_last = q1, q2_last = q2, q3_last = q3;
+    q0 += (-q1_last * gx - q2_last * gy - q3_last * gz) * halfT;
+    q1 += ( q0_last * gx + q2_last * gz - q3_last * gy) * halfT;
+    q2 += ( q0_last * gy - q1_last * gz + q3_last * gx) * halfT;
+    q3 += ( q0_last * gz + q1_last * gy - q2_last * gx) * halfT;
+
+    // 7. 四元数归一化 (防止积分过程中由于精度舍入失去单位特性)
+    norm = sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+    q0 /= norm;
+    q1 /= norm;
+    q2 /= norm;
+    q3 /= norm;
 }
 // ==========================================
 // 核心逻辑实现
@@ -117,7 +121,7 @@ void IMU_Parse_Data(uint8_t *raw_payload)
     float gx = phy_gyro[0];
     float gy = phy_gyro[1];
     float gz = phy_gyro[2];
-    MahonyAHRSupdateIMU(gx, gy, gz, ax, ay, az);
+
 }
 
 void IMU_Get_Quaternion(float *q) {
@@ -125,9 +129,29 @@ void IMU_Get_Quaternion(float *q) {
 }
 
 void IMU_Get_EulerAngles(float *pitch, float *roll, float *yaw) {
-    *pitch = asinf(-2.0f * (q1 * q3 - q0 * q2)) * 57.29578f; 
-    *roll  = atan2f(2.0f * (q2 * q3 + q0 * q1), q0 * q0 - q1 * q1 + q2 * q2 - q3 * q3) * 57.29578f;
-    *yaw   = atan2f(2.0f * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 57.29578f;
+    // 1. 计算常用的平方项，节约重复计算的算力
+    float q0q0 = q0 * q0;
+    float q1q1 = q1 * q1;
+    float q2q2 = q2 * q2;
+    float q3q3 = q3 * q3;
+
+    // 2. Roll (横滚角) - 弧度转角度
+    // 公式：atan2(2*(q0*q1 + q2*q3), 1 - 2*(q1*q1 + q2*q2))
+    *roll = atan2f(2.0f * (q0 * q1 + q2 * q3), q0q0 - q1q1 - q2q2 + q3q3) * 57.29578f;
+
+    // 3. Pitch (俯仰角) - 弧度转角度
+    // 公式：asin(2*(q0*q2 - q1*q3))
+    // 注意：asin 的输入必须在 [-1, 1] 之间，否则会报错 NaN
+    float sinp = 2.0f * (q0 * q2 - q1 * q3);
+    if (fabsf(sinp) >= 1.0f)
+        *pitch = copysignf(1.570796f, sinp) * 57.29578f; // 限制在 ±90度
+    else
+        *pitch = asinf(sinp) * 57.29578f;
+
+    // 4. Yaw (偏航角) - 弧度转角度
+    // 公式：atan2(2*(q0*q3 + q1*q2), 1 - 2*(q2*q2 + q3*q3))
+    // 注意：没有磁力计的情况下，Yaw 会随时间缓慢漂移，仅供参考
+    *yaw = atan2f(2.0f * (q0 * q3 + q1 * q2), q0q0 + q1q1 - q2q2 - q3q3) * 57.29578f;
 }
 // ==========================================
 // 提供给外部的读取接口 (Getters)

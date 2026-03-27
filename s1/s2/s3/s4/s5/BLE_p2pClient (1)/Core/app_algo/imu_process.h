@@ -6,6 +6,8 @@
 // 1. 核心解析函数：供蓝牙模块在收到 16 字节数据后调用
 void IMU_Parse_Data(uint8_t *raw_payload);
 
+void MahonyAHRSupdateIMU(float gx, float gy, float gz, float ax, float ay, float az);
+
 void IMU_Get_Quaternion(float *q);
 
 void IMU_Get_EulerAngles(float *pitch, float *roll, float *yaw);
